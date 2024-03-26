@@ -1,13 +1,13 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <ui version="4.0">
- <class>TaskManager</class>
- <widget class="QMainWindow" name="TaskManager">
+ <class>MainWindow</class>
+ <widget class="QMainWindow" name="MainWindow">
   <property name="geometry">
    <rect>
     <x>0</x>
     <y>0</y>
-    <width>284</width>
-    <height>241</height>
+    <width>172</width>
+    <height>193</height>
    </rect>
   </property>
   <property name="windowTitle">
