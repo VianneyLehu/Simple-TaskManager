@@ -4,8 +4,6 @@
 #define GB (MB*1024)
 #define TB (GB *1024)
 
-#pragma comment(lib, "pdh.lib")
-
 static PDH_HQUERY cpuQuery;
 static PDH_HCOUNTER cpuTotal;
 

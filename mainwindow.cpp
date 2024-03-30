@@ -1,9 +1,5 @@
 // Include necessary headers
 #include "mainwindow.h"
-#include <vector>
-#include "process.h"
-#include "pdh.h"
-#include "cpu.h"
 
 #define KB 1024
 #define MB (KB*1024)
@@ -18,12 +14,15 @@ MainWindow::MainWindow(QWidget *parent): QMainWindow(parent)
     // Set up main window and tabs
     createMainWindow();
 
+    addDetailsTab();
+
     addCpuGraphToPerformanceTab();
 
     addProcessInfoToProcessusTab();
 
 }
 
+// ---------- CPU TAB -------------
 
 
 void MainWindow::setupCpuGraph()
@@ -129,19 +128,20 @@ void MainWindow::addCpuGraphToPerformanceTab()
 
 }
 
+// ---------- PROCESS TAB -------------
 
 
 void MainWindow::addProcessInfoToProcessusTab()
 {
     // Create table widget for process info
-    tableWidget = new QTableWidget(processusTab);
-    tableWidget->setColumnCount(3);
-    tableWidget->setHorizontalHeaderLabels(QStringList() << "PID" << "Name" << "Memory Usage (MB)");
-    tableWidget->horizontalHeader()->setSectionResizeMode(QHeaderView::Stretch);
+    processtableWidget = new QTableWidget(processusTab);
+    processtableWidget->setColumnCount(3);
+    processtableWidget->setHorizontalHeaderLabels(QStringList() << "PID" << "Name" << "Memory Usage (MB)");
+    processtableWidget->horizontalHeader()->setSectionResizeMode(QHeaderView::Stretch);
 
     // Add table widget to the "Processus" tab
     QVBoxLayout *processusLayout = new QVBoxLayout(processusTab);
-    processusLayout->addWidget(tableWidget);
+    processusLayout->addWidget(processtableWidget);
 
     timer = new QTimer(this);
     connect(timer, SIGNAL(timeout()), this, SLOT(updateProcessInfo()));
@@ -165,25 +165,122 @@ void MainWindow::updateProcessInfo() {
 
 void MainWindow::populateTable() {
     // Clear existing table contents
-    tableWidget->clearContents();
-    tableWidget->setRowCount(0);
+    processtableWidget->clearContents();
+    processtableWidget->setRowCount(0);
 
     // Populate the table with updated process info
-    tableWidget->setRowCount(processInfoList.size());
+    processtableWidget->setRowCount(processInfoList.size());
     for (int i = 0; i < processInfoList.size(); ++i) {
         QTableWidgetItem *pidItem = new QTableWidgetItem(QString::number(processInfoList[i].GetPID()));
         QTableWidgetItem *nameItem = new QTableWidgetItem(QString::fromStdString(processInfoList[i].GetName()));
         QTableWidgetItem *memoryItem = new QTableWidgetItem(QString::number(processInfoList[i].GetMemoryUsageMB()));
 
-        tableWidget->setItem(i, 0, pidItem);
-        tableWidget->setItem(i, 1, nameItem);
-        tableWidget->setItem(i, 2, memoryItem);
+        processtableWidget->setItem(i, 0, pidItem);
+        processtableWidget->setItem(i, 1, nameItem);
+        processtableWidget->setItem(i, 2, memoryItem);
     }
 }
+
+
+
+
+// ---------- DETAILS TAB -------------
+
+
+void MainWindow::initializeDetailsTab() {
+    // Create table widget for process info
+    detailstableWidget = new QTableWidget(detailsTab);
+    detailstableWidget->setColumnCount(4); // Added 4 columns for PID, Name, VirtualSize, WorkingSetSize
+    detailstableWidget->setHorizontalHeaderLabels(QStringList() << "PID" << "Name" << "VirtualSize" << "WorkingSetSize");
+    detailstableWidget->horizontalHeader()->setSectionResizeMode(QHeaderView::Stretch);
+
+    // Add table widget to the "Details" tab
+    QVBoxLayout *detailsLayout = new QVBoxLayout(detailsTab);
+    detailsLayout->addWidget(detailstableWidget);
+}
+
+
+void MainWindow::addDetailsTab()
+{
+    // Initialize the details tab
+    initializeDetailsTab();
+
+    // Start a timer to update details periodically
+    timer = new QTimer(this);
+    connect(timer, SIGNAL(timeout()), this, SLOT(updateDetails()));
+    timer->start(1000); // 1000 milliseconds = 1 second
+
+    // Initial population of the table
+    updateDetails();
+}
+
+void MainWindow::updateDetails() {
+    // Clear the previous details
+    detailstableWidget->clearContents();
+    detailstableWidget->setRowCount(0);
+
+    // Generate details information
+    generatePsystemInfo();
+    // Populate the table with updated details
+}
+
+std::wstring MainWindow::convertToSize(SIZE_T size) {
+    WCHAR buffer[MAX_PATH];
+    if (StrFormatByteSizeW(size, buffer, MAX_PATH) == NULL) {
+        return L"";
+    }
+    return std::wstring(buffer);
+}
+
+int MainWindow::generatePsystemInfo(){
+    DWORD dwRet;
+    DWORD dwSize = 0x0;
+    NTSTATUS dwstatus;
+    PSYSTEM_PROCESS_INFORMATION p = nullptr;
+
+    while (true) {
+        if (p != nullptr) VirtualFree(p, 0x0, MEM_RELEASE);
+        p = (PSYSTEM_PROCESS_INFORMATION)VirtualAlloc(nullptr, dwSize, MEM_COMMIT | MEM_RESERVE, PAGE_READWRITE);
+        dwstatus = NtQuerySystemInformation(SystemProcessInformation, (PVOID)p, (ULONG)dwSize, &dwRet);
+
+        if (dwstatus == STATUS_SUCCESS) break;
+        else if (dwstatus != STATUS_INFO_LENGTH_MISMATCH) {
+            VirtualFree(p, 0x0, MEM_RELEASE);
+            p = nullptr;
+            std::cerr << "[!] Error fetching process information" << std::endl;
+            return 0x1;
+        }
+        dwSize = dwRet + (2 << 12);
+    }
+
+    do {
+        int row = detailstableWidget->rowCount();
+        detailstableWidget->insertRow(row);
+
+        QTableWidgetItem* idItem = new QTableWidgetItem(QString::number(HandleToULong(p->UniqueProcessId)));
+        QTableWidgetItem* nameItem = new QTableWidgetItem(QString::fromWCharArray(p->ImageName.Buffer ? p->ImageName.Buffer : L""));
+        QTableWidgetItem* virtualSizeItem = new QTableWidgetItem(QString::fromStdWString(convertToSize(p->VirtualMemoryCounters.VirtualSize)));
+        QTableWidgetItem* workingSetSizeItem = new QTableWidgetItem(QString::fromStdWString(convertToSize(p->VirtualMemoryCounters.WorkingSetSize)));
+
+        detailstableWidget->setItem(row, 0, idItem);
+        detailstableWidget->setItem(row, 1, nameItem);
+        detailstableWidget->setItem(row, 2, virtualSizeItem);
+        detailstableWidget->setItem(row, 3, workingSetSizeItem);
+
+        p = (PSYSTEM_PROCESS_INFORMATION)((PBYTE)p + p->NextEntryOffset);
+    } while (p->NextEntryOffset != 0);
+
+    VirtualFree(p, 0x0, MEM_RELEASE);
+
+    return 0x0;
+}
+
+
 
 MainWindow::~MainWindow()
 {
 
-    delete tableWidget;
+    delete detailstableWidget;
+    delete processtableWidget;
     delete timer;
 }

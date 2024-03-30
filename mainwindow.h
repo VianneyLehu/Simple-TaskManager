@@ -5,6 +5,12 @@
 #include <QtCharts>
 #include <QChartView>
 #include <QTimer>
+#include <vector>
+#include "process.h"
+#include "pdh.h"
+#include "cpu.h"
+#include "pch.h"
+
 #include "process.h"
 
 
@@ -22,6 +28,7 @@ public:
 private slots:
     void updateProcessInfo();
     void updateCpuGraph();
+    void updateDetails();
 
 
 private:
@@ -30,12 +37,24 @@ private:
     void addCpuGraphToPerformanceTab();
     void addProcessInfoToProcessusTab();
     void populateTable();
+    void displayPsystem(PSYSTEM_PROCESS_INFORMATION p);
+    std::wstring convertToSize(SIZE_T size);
+    int generatePsystemInfo();
+    void initializeDetailsTab();
+    void addDetailsTab();
+
+
+
+
+
+
 
     QTabWidget *tabWidget;
     QWidget *processusTab;
     QWidget *performanceTab;
     QWidget *detailsTab;
-    QTableWidget *tableWidget;
+    QTableWidget *processtableWidget;
+    QTableWidget *detailstableWidget;
     QTimer *timer;
     std::vector<ProcessInfo> processInfoList;
     QChart *chart;
